@@ -11,9 +11,9 @@ import random
 MODEL_NAME = "gemini-2.5-flash-lite" 
 
 # --- SETUP STREAMLIT ---
-st.set_page_config(page_title="AI Breach Protocol", page_icon="🔓", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="AI Breach Protocol", page_icon="🔓", layout="wide", initial_sidebar_state="expanded")
 
-# --- CUSTOM CSS (MODERN & CLEAN) ---
+# --- CUSTOM CSS (MOBILE OPTIMIZED & LOCKED SIDEBAR) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600&display=swap');
@@ -24,31 +24,42 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* Login Screen Specifics */
+    /* Sidebar-Toggle Button ausblenden (NUR DESKTOP) */
+    @media (min-width: 992px) {
+        [data-testid="stSidebarCollapseBtn"] {
+            display: none !important;
+        }
+    }
+    
+    /* Login Screen - Desktop Standard */
     .login-container {
         border: 1px solid #333;
         padding: 40px;
         border-radius: 12px;
         background-color: #121215;
         text-align: center;
-        margin-top: 100px;
+        margin-top: 80px;
     }
     
+    /* Inputs */
     .stTextInput > div > div > input {
         background-color: #18181b;
         color: #fff;
         border: 1px solid #333;
+        font-size: 16px !important; 
     }
     .stTextInput > div > div > input:focus {
         border-color: #00f3ff;
         box-shadow: none;
     }
     
+    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #121215;
         border-right: 1px solid #222;
     }
     
+    /* Chat Messages */
     [data-testid="stChatMessage"] {
         background-color: #18181b;
         border: 1px solid #27272a;
@@ -59,18 +70,21 @@ st.markdown("""
         border-left: 3px solid #00f3ff;
     }
     
+    /* Buttons */
     .stButton button {
         border: 1px solid #333;
         color: #fff;
         background: #18181b;
         transition: 0.2s;
         border-radius: 6px;
+        min-height: 45px; /* Größere Touch-Fläche */
     }
     .stButton button:hover {
         border-color: #00f3ff;
         color: #00f3ff;
     }
     
+    /* Level Display Desktop */
     .level-display {
         font-size: 3.5rem;
         font-weight: 700;
@@ -95,6 +109,20 @@ st.markdown("""
         color: #666;
         text-align: center;
     }
+
+    /* --- MOBILE OPTIMIERUNG --- */
+    @media only screen and (max-width: 600px) {
+        .login-container {
+            margin-top: 20px !important;
+            padding: 20px !important;
+        }
+        .level-display {
+            font-size: 2.5rem !important;
+        }
+        .stChatInput {
+            bottom: 20px !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -110,33 +138,34 @@ def check_login():
     if st.session_state.authenticated:
         return True
 
-    # Login Screen Layout
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="text-align: center; font-family: 'Fira Code'; margin-bottom: 20px;">
-            <h1 style="color: #ff0055;">SYSTEM LOCKED</h1>
-            <p style="color: #666;">RESTRICTED AREA. AUTHORIZATION REQUIRED.</p>
+        <div class="login-container">
+            <div style="text-align: center; font-family: 'Fira Code'; margin-bottom: 20px;">
+                <h1 style="color: #ff0055; font-size: 2rem;">SYSTEM LOCKED</h1>
+                <p style="color: #666; font-size: 0.9rem;">RESTRICTED AREA. AUTHORIZATION REQUIRED.</p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        password = st.text_input("ACCESS CODE", type="password", placeholder="Enter System Password", label_visibility="collapsed")
-        
-        if st.button("AUTHENTICATE", use_container_width=True):
-            if "APP_PASSWORD" in st.secrets and password == st.secrets["APP_PASSWORD"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.toast("ACCESS DENIED.", icon="⛔")
+        with st.container():
+            st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+            password = st.text_input("ACCESS CODE", type="password", placeholder="Enter System Password", label_visibility="collapsed")
+            st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+            
+            if st.button("AUTHENTICATE", use_container_width=True):
+                if "APP_PASSWORD" in st.secrets and password == st.secrets["APP_PASSWORD"]:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.toast("ACCESS DENIED.", icon="⛔")
     
     return False
 
 if not check_login():
     st.stop()
-
-# Sidebar wieder aufklappen, wenn man drin ist
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # --- SECRETS & KEYS LADEN ---
 API_KEYS = []
@@ -283,13 +312,24 @@ def get_ai_response(user_input, level_data, history):
 
 def check_password():
     current_input = st.session_state.password_input.strip().upper()
+    
+    # Empty Check (verhindert Fehlermeldung beim Löschen)
+    if not current_input:
+        return
+
     current_level_key = str(st.session_state.level)
     
     if current_level_key in LEVELS and current_input == LEVELS[current_level_key]['password']:
+        # --- SUCCESS ANIMATION START ---
+        st.balloons()
+        st.toast("ACCESS GRANTED!", icon="✅")
+        time.sleep(1) # Kurze Pause, damit man die Ballons sieht bevor das Level wechselt
+        # --- SUCCESS ANIMATION ENDE ---
+        
         advance_level(st.session_state.level + 1)
         return
     
-    st.toast("Passwort falsch.", icon="❌")
+    st.toast("ACCESS DENIED!", icon="❌")
 
 def advance_level(new_level):
     st.session_state.level = new_level
@@ -307,9 +347,12 @@ def reset_game():
     st.session_state.history = []
     st.session_state.game_complete = False
     st.query_params.clear()
-    st.rerun()
 
 # --- UI START ---
+
+# DEFINITION DER AVATARE
+USER_AVATAR = "🕵️‍♂️"
+AI_AVATAR = "🤖"
 
 # 1. SIDEBAR
 with st.sidebar:
@@ -344,22 +387,27 @@ else:
         chat_container = st.container()
         with chat_container:
             if not st.session_state.history:
-                with st.chat_message("assistant"):
+                # Initialnachricht mit AI Avatar
+                with st.chat_message("assistant", avatar=AI_AVATAR):
                     st.markdown("Initialisiere Protokoll... Ich bin bereit. Versuch nicht mich auszutricksen.")
             
             for message in st.session_state.history:
-                with st.chat_message(message["role"]):
+                # Wähle den richtigen Avatar basierend auf der Rolle
+                icon = USER_AVATAR if message["role"] == "user" else AI_AVATAR
+                with st.chat_message(message["role"], avatar=icon):
                     st.markdown(message["content"])
 
         if prompt := st.chat_input("Schreibe eine Nachricht an die KI..."):
-            with st.chat_message("user"):
+            # User Nachricht mit User Avatar
+            with st.chat_message("user", avatar=USER_AVATAR):
                 st.markdown(prompt)
             st.session_state.history.append({"role": "user", "content": prompt})
             
             with st.spinner("KI denkt nach..."):
                 response_text = get_ai_response(prompt, LEVELS[level_key], st.session_state.history)
             
-            with st.chat_message("assistant"):
+            # AI Antwort mit AI Avatar
+            with st.chat_message("assistant", avatar=AI_AVATAR):
                 st.write_stream(stream_text(response_text))
             
             st.session_state.history.append({"role": "assistant", "content": response_text})
